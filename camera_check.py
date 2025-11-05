@@ -109,23 +109,20 @@ if __name__ == "__main__":
     print("🚀 Jetson Nano Camera Check Utility")
     print("-----------------------------------")
 
-    # Optional: show /dev/video* for reference
-    print("\n📸 Available /dev/video* devices:")
-    os.system("ls /dev/video* || echo 'No video devices found.'")
-
-    # Detect connected cameras
     connected_cams = detect_cameras()
-    time.sleep(1)
-
     if not connected_cams:
         print("\n❌ No Raspberry Pi cameras detected.")
     else:
         print(f"\n✅ Detected {len(connected_cams)} camera(s): {connected_cams}")
 
-        if len(connected_cams) == 1:
-            test_camera(connected_cams[0])
-        elif len(connected_cams) >= 2:
-            # Try showing both side-by-side
-            dual_camera_preview()
+        # Test each camera sequentially
+        for cam_id in connected_cams:
+            print(f"\n🔎 Opening camera {cam_id} individually...")
+            test_camera(cam_id)
+            print(f"✅ Camera {cam_id} test complete.\n")
+            time.sleep(1)
+
+        print("\nℹ️ Dual camera preview skipped (not supported on Jetson Nano).")
 
     print("\n✅ Camera check complete.")
+
