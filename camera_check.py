@@ -18,7 +18,7 @@ def detect_cameras(max_cameras=2):
             "video/x-raw(memory:NVMM),width=640,height=480,framerate=30/1 ! "
             "nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink"
         )
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
         if cap.isOpened():
             connected.append(sensor_id)
             cap.release()
