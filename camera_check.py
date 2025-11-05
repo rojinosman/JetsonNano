@@ -42,6 +42,6 @@ if __name__ == "__main__":
     print("----------------------------------------")
 
     os.system("ls /dev/video* || echo 'No /dev/video devices found.'")
-    test_camera(sensor_id=1)
+    test_camera(sensor_id=0)
 
     print("\n✅ Camera check complete.")
