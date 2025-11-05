@@ -2,37 +2,42 @@
 """
 camera_check.py
 ----------------
-Robust Jetson Nano camera tester.
-- Detects connected CSI cameras
-- Confirms actual frame capture before declaring a camera 'working'
-- Handles missing/unplugged cameras gracefully
+Detects and tests Raspberry Pi v2 cameras connected to a Jetson Nano.
+
+Features:
+- Detects how many CSI cameras are connected
+- Tests each connected camera using GStreamer + OpenCV
+- Handles one or two cameras gracefully
+- Shows live preview (press ESC to exit)
 """
 
+import os
 import cv2
 import time
-import os
+import subprocess
 
-def camera_available(sensor_id):
-    """Try to open and grab one frame to confirm a real working camera."""
-    gst = (
-        f"nvarguscamerasrc sensor-id={sensor_id} ! "
-        "video/x-raw(memory:NVMM),width=640,height=480,framerate=30/1 ! "
-        "nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink"
-    )
-    cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-    if not cap.isOpened():
-        cap.release()
-        return False
-
-    # Try to read one frame
-    ret, _ = cap.read()
-    cap.release()
-    return ret  # True if a valid frame was read
+def detect_cameras(max_cameras=2):
+    """
+    Detect how many CSI cameras are connected (0, 1, or 2).
+    Returns a list of working camera sensor IDs.
+    """
+    connected = []
+    for sensor_id in range(max_cameras):
+        gst = (
+            f"nvarguscamerasrc sensor-id={sensor_id} ! "
+            "video/x-raw(memory:NVMM),width=640,height=480,framerate=30/1 ! "
+            "nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink"
+        )
+        cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
+        if cap.isOpened():
+            connected.append(sensor_id)
+            cap.release()
+    return connected
 
 
 def test_camera(sensor_id):
-    """Preview a single camera feed."""
-    print(f"\n🎥 Testing camera sensor-id={sensor_id}...")
+    """Show live preview for a specific camera."""
+    print(f"\n🎥 Testing camera sensor-id={sensor_id} ...")
     gst = (
         f"nvarguscamerasrc sensor-id={sensor_id} ! "
         "video/x-raw(memory:NVMM),width=640,height=480,framerate=30/1 ! "
@@ -42,41 +47,85 @@ def test_camera(sensor_id):
     cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
     if not cap.isOpened():
         print(f"❌ Failed to open camera {sensor_id}.")
-        return
+        return False
 
-    print(f"✅ Camera {sensor_id} opened. Press ESC to exit preview.")
+    print(f"✅ Camera {sensor_id} opened successfully. Press ESC to exit preview.")
     while True:
         ret, frame = cap.read()
         if not ret:
-            print(f"⚠️ Frame capture failed for camera {sensor_id}.")
-            break  # exit instead of looping forever
-
+            print("⚠️ Frame capture failed.")
+            continue
         cv2.imshow(f"Camera {sensor_id}", frame)
-        if cv2.waitKey(1) & 0xFF == 27:
+        if cv2.waitKey(1) & 0xFF == 27:  # ESC
             break
 
     cap.release()
     cv2.destroyAllWindows()
-    print(f"✅ Camera {sensor_id} test complete.")
+    return True
+
+
+def dual_camera_preview():
+    """Attempt to open both cameras side-by-side if both are connected."""
+    print("\n🎥 Attempting dual camera preview...")
+
+    gst0 = (
+        "nvarguscamerasrc sensor-id=0 ! "
+        "video/x-raw(memory:NVMM),width=640,height=480,framerate=30/1 ! "
+        "nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink"
+    )
+    gst1 = (
+        "nvarguscamerasrc sensor-id=1 ! "
+        "video/x-raw(memory:NVMM),width=640,height=480,framerate=30/1 ! "
+        "nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink"
+    )
+
+    cap0 = cv2.VideoCapture(gst0, cv2.CAP_GSTREAMER)
+    cap1 = cv2.VideoCapture(gst1, cv2.CAP_GSTREAMER)
+
+    if not (cap0.isOpened() and cap1.isOpened()):
+        print("❌ Could not open both cameras simultaneously.")
+        return
+
+    print("✅ Both cameras opened successfully. Press ESC to exit.")
+    while True:
+        ret0, frame0 = cap0.read()
+        ret1, frame1 = cap1.read()
+        if not (ret0 and ret1):
+            print("⚠️ Frame read error.")
+            continue
+
+        combined = cv2.hconcat([frame0, frame1])
+        cv2.imshow("Dual Camera", combined)
+
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+
+    cap0.release()
+    cap1.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    print("🚀 Jetson Nano Camera Check (Robust Mode)")
-    print("------------------------------------------")
+    print("🚀 Jetson Nano Camera Check Utility")
+    print("-----------------------------------")
 
-    os.system("ls /dev/video* || echo 'No /dev/video devices found.'")
+    # Optional: show /dev/video* for reference
+    print("\n📸 Available /dev/video* devices:")
+    os.system("ls /dev/video* || echo 'No video devices found.'")
 
-    detected_cams = []
-    for cam_id in range(2):  # Check sensor-id 0 and 1
-        if camera_available(cam_id):
-            detected_cams.append(cam_id)
+    # Detect connected cameras
+    connected_cams = detect_cameras()
+    time.sleep(1)
 
-    if not detected_cams:
-        print("\n❌ No working cameras detected.")
+    if not connected_cams:
+        print("\n❌ No Raspberry Pi cameras detected.")
     else:
-        print(f"\n✅ Working camera(s) detected: {detected_cams}")
-        for cam_id in detected_cams:
-            test_camera(cam_id)
-            time.sleep(1)
+        print(f"\n✅ Detected {len(connected_cams)} camera(s): {connected_cams}")
+
+        if len(connected_cams) == 1:
+            test_camera(connected_cams[0])
+        elif len(connected_cams) >= 2:
+            # Try showing both side-by-side
+            dual_camera_preview()
 
     print("\n✅ Camera check complete.")
