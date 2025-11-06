@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-yolo_live.py
-Run YOLOv8-Lite object detection on Jetson Nano using the CSI camera.
+yolo11_live.py
+Run YOLOv11-Lite object detection on Jetson Nano using the CSI camera.
 """
 
 from ultralytics import YOLO
 import cv2
 
-# Load YOLOv8-Lite model (lightweight for Jetson Nano)
-model = YOLO("yolov8n-lite.pt")
+# Load YOLOv11-Lite model (nano lite version)
+model = YOLO("yolo11n-lite.pt")
 
 # Jetson Nano CSI camera pipeline
 gst = (
@@ -25,7 +25,7 @@ if not cap.isOpened():
     print("❌ Failed to open camera.")
     exit()
 
-print("✅ YOLOv8-Lite live detection started (press ESC to quit)")
+print("✅ YOLOv11-Lite live detection started (press ESC to quit)")
 
 while True:
     ret, frame = cap.read()
@@ -36,7 +36,7 @@ while True:
     results = model(frame, verbose=False)
     annotated = results[0].plot()
 
-    cv2.imshow("YOLOv8-Lite", annotated)
+    cv2.imshow("YOLOv11-Lite", annotated)
 
     if cv2.waitKey(1) & 0xFF == 27:
         break
